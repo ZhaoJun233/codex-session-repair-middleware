@@ -1,0 +1,7 @@
+node_modules/
+*.tgz
+.local/
+.npmrc
+*.local.json
+*.log
+test/engine/*.exe
