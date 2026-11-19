@@ -19,6 +19,17 @@ test("declares a default-disabled middleware-only package", () => {
   assert.match(pkg.description, /[\u4e00-\u9fff]/);
 });
 
+test("uses generic public summaries and the official public registry", async () => {
+  const names = /magpie|agentrouter|opencode|codex/i;
+  assert.equal(names.test(pkg.description), false);
+  assert.equal(pkg.keywords.some(keyword => names.test(keyword)), false);
+  assert.deepEqual(pkg.publishConfig, { access: "public", registry: "https://registry.npmjs.org/" });
+  const readme = await readFile(join(root, "README.md"), "utf8");
+  assert.equal(names.test(readme.split("\n\n").slice(0, 2).join("\n\n")), false);
+  assert.equal(/agentrouter|opencode-agentrouter-auth/i.test(readme), false);
+  assert.equal(names.test(await readFile(join(root, "CHANGELOG.md"), "utf8")), false);
+});
+
 test("uses an explicit public-file allowlist without test or private configuration", async () => {
   assert.deepEqual(pkg.files, [
     "codex-session-repair.middleware.js", "session-repair.mjs", "options.example.json",

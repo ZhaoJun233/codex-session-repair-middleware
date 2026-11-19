@@ -1,19 +1,37 @@
-# Codex 会话资源清理中间件
+# 会话资源清理中间件
 
-独立的 Magpie 网关中间件，默认关闭。只清理发往 `/responses` 的请求副本，不读写 Codex 的会话文件、数据库或登录配置，也不依赖 AgentRouter 插件。
+可独立开关的网关中间件，默认关闭。只清理发往 `/responses` 的请求副本，不读写客户端的会话文件、数据库或登录配置，也不依赖供应商插件。
 
 **这是有损的兼容模式，不是无损恢复。** 启用后会丢弃加密推理、压缩记录及服务器引用，可能损失重要上下文。优先新建会话，或由客户端补齐完整的可见历史；仅在明确接受损失时启用。
 
 ## 安装与开关
 
-需要支持 `magpie.middleware` 和 `ctx.reject` 的 Magpie。本项目按 Magpie `0.1.3906` 的源码接口及其 `moejs 0.1.0` 引擎开发。
+需要支持 `magpie.middleware` 和 `ctx.reject` 的网关宿主。接口基于宿主 `0.1.3906` 的源码和 `moejs 0.1.0` 引擎开发。
 
-克隆仓库后安装整个目录：
+通过 npm 包安装中间件，安装后清理默认关闭：
+
+```powershell
+magpie plugin add npm:codex-session-repair-middleware@0.1.1
+```
+
+明确接受有损清理后开启：
+
+```powershell
+magpie plugin options codex-session-repair-middleware '{"enabled":true}'
+```
+
+也可在项目目录通过 npm 获取文件，再将完整包目录注册到宿主：
+
+```powershell
+npm install codex-session-repair-middleware@0.1.1 --ignore-scripts --registry=https://registry.npmjs.org/
+magpie plugin add './node_modules/codex-session-repair-middleware'
+```
+
+从源码安装时，克隆仓库并安装整个目录：
 
 ```powershell
 git clone https://github.com/ZhaoJun233/codex-session-repair-middleware.git
 magpie plugin add './codex-session-repair-middleware'
-magpie plugin options codex-session-repair-middleware '{"enabled":true}'
 ```
 
 关闭清理：
@@ -22,7 +40,7 @@ magpie plugin options codex-session-repair-middleware '{"enabled":true}'
 magpie plugin options codex-session-repair-middleware '{"enabled":false}'
 ```
 
-也可在 Magpie 的插件设置中修改该中间件的 JSON 选项。只有布尔值 `true` 开启清理；未配置、`false`、`"true"` 或 `1` 都不启用。`package.json` 的 `magpie.options` 只是编辑器示例，实际开关由保存的插件选项决定，不需要重新登录。
+也可在宿主的插件设置中修改该中间件的 JSON 选项。只有布尔值 `true` 开启清理；未配置、`false`、`"true"` 或 `1` 都不启用。`package.json` 的 `magpie.options` 只是编辑器示例，实际开关由保存的插件选项决定，不需要重新登录。
 
 如需完全停用或恢复加载：
 
@@ -33,7 +51,7 @@ magpie plugin on codex-session-repair-middleware
 
 `on` 只恢复中间件加载，不会把 `enabled:false` 改成 `true`。宿主的内置 `middleware` 功能也必须处于启用状态。配置重载由 Magpie 管理。
 
-Linux/远程服务器同样用 `magpie plugin add /实际目录/codex-session-repair-middleware` 安装整个目录，保留入口文件、`session-repair.mjs` 和 `package.json`。本项目尚未发布到 npm，以上命令不要求 npm 发布。
+Linux/远程服务器同样可以从 npm 包安装，或用 `magpie plugin add /实际目录/codex-session-repair-middleware` 注册整个目录，保留入口文件、`session-repair.mjs` 和 `package.json`。如果安装了同一中间件的多个来源，应仅保留一个启用的实例。
 
 ## 处理规则
 
@@ -63,12 +81,12 @@ Linux/远程服务器同样用 `magpie plugin add /实际目录/codex-session-re
 ## 范围与限制
 
 - 仅处理 `ctx.protocol === "responses"` 且路径以 `/responses` 结尾的代理请求。`/responses/compact`、Chat、Anthropic、Gemini 请求绕过；响应及 SSE 不修改。
-- 清理发生在供应商选择前，因此不是 AgentRouter 专属开关，会影响所有经过该中间件的 Responses 代理请求。
-- 只有经过 Magpie `serveAgent` 的请求会进入该链；宿主自身请求及其他网关入口可能绕过。宿主对旧响应历史的处理发生在中间件之前，若此时已拒绝未知 `previous_response_id`，中间件无法补救。
+- 清理发生在供应商选择前，不限定某个供应商，会影响所有经过该中间件的 Responses 代理请求。
+- 只有经过宿主 `serveAgent` 的请求会进入该链；宿主自身请求及其他网关入口可能绕过。宿主对旧响应历史的处理发生在中间件之前，若此时已拒绝未知 `previous_response_id`，中间件无法补救。
 - 运行于网关内的 moejs，没有网络、文件系统或定时器依赖，不包含登录、文字过滤、其他历史内联逻辑或上游错误诊断。
 - 中间件接收宿主解析后的 JSON 对象，没有原始请求头、编码及线上的字节大小信息；请求重新编码由宿主负责。不继承原供应商插件的 4 MiB 检查边界或两秒 Request 克隆期限。
-- Magpie 对 `onRequest` 设置 250 ms 执行期限。意外异常或执行超时由宿主记录失败并放行原请求；预期的空输入/工具缺失错误通过 `ctx.reject` 显式拦截。它不是安全隔离或强制过滤器。
-- 不建议同时开启原 AgentRouter 插件中的同名清理功能，便于明确清理由哪一层负责；本项目不改变原插件的任何开关或代码。
+- 宿主对 `onRequest` 设置 250 ms 执行期限。意外异常或执行超时由宿主记录失败并放行原请求；预期的空输入/工具缺失错误通过 `ctx.reject` 显式拦截。它不是安全隔离或强制过滤器。
+- 不建议同时开启其他组件中的同类清理功能，便于明确清理由哪一层负责；本项目不改变其他组件的任何开关或代码。
 
 ## 开发验证
 
@@ -83,4 +101,4 @@ npm pack --dry-run
 
 Node 测试检查副本语义、开关、幂等性及打包声明；Go 测试用与宿主相同的 moejs 编译、链接、解析、调用和序列化接口执行相同的合成用例。测试不访问真实会话、账号或上游服务，不等同于远程部署或真实 Codex 会话验证。
 
-清理核心复用 `opencode-agentrouter-auth 0.1.10` 的 `session-repair.mjs`，保留 MIT 许可。发布文件采用显式白名单，不含测试、凭据或本地配置。
+清理核心保留原有 MIT 许可和版权声明。发布文件采用显式白名单，不含测试、凭据或本地配置。

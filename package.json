@@ -1,7 +1,7 @@
 {
   "name": "codex-session-repair-middleware",
-  "version": "0.1.0",
-  "description": "Magpie 网关中间件：可独立开关的 Codex 会话资源清理，仅清理请求副本，默认关闭；启用后可能丢失加密或压缩上下文",
+  "version": "0.1.1",
+  "description": "可独立开关的会话资源清理中间件：仅处理请求副本，默认关闭；启用后可能丢失加密或压缩上下文",
   "type": "module",
   "scripts": {
     "test": "node --test test/middleware.test.mjs test/session-repair.test.mjs test/package.test.mjs",
@@ -17,17 +17,20 @@
     "LICENSE"
   ],
   "keywords": [
-    "magpie",
-    "magpie-middleware",
-    "codex",
+    "middleware",
     "responses",
     "session-repair",
+    "session-cleanup",
     "llm-gateway"
   ],
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ZhaoJun233/codex-session-repair-middleware.git"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "magpie": {
     "middleware": "./codex-session-repair.middleware.js",
